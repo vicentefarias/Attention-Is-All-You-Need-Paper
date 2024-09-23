@@ -14,6 +14,7 @@ class InputEmbeddings(nn.Module):
         # Scale embeddings by sqrt(d_model) for more stable training
         return self.embedding(x) * math.sqrt(self.d_model)
 
+
 class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model: int, seq_len: int, dropout: float) -> None:
@@ -57,6 +58,7 @@ class LayerNormalization(nn.Module):
         std =   x.std(dim = -1, keepdim=True)  # Std along the last dimension
         # Normalize and apply scale and bias
         return self.alpha * (x - mean) / (std + self.eps) + self.bias 
+
 
 class FeedForward(nn.Module):
     def __init__(self, d_model: int, d_ff: int, dropout: float) -> None:
@@ -129,39 +131,47 @@ class MultiHeadAttention(nn.Module):
 
         return self.w_o(x)
 
+
 class ResidualConnection(nn.Module):
 
     def __init__(self, dropout: float) -> None:
         super().__init__()
-        self.dropout = nn.Dropout(dropout)
-        self.norm = LayerNormalization()
+        self.dropout = nn.Dropout(dropout)  # Apply dropout after sublayer
+        self.norm = LayerNormalization()    # Layer normalization before sublayer
 
     def forward(self, x, sublayer):
+        # Apply layer normalization, pass through the sublayer, add residual connection, and apply dropout
         return x + self.dropout(sublayer(self.norm(x)))
+
 
 class EncoderBlock(nn.Module):
 
     def __init__(self, self_attention_block: MultiHeadAttention, feed_forward_block: FeedForward, dropout: float) -> None:
         super().__init__()
-        self.self_attention_block = self_attention_block
-        self.feed_forward_block = feed_forward_block
-        self.residual_connection = nn.ModuleList([ResidualConnection(dropout) for _ in range(2)])
+        self.self_attention_block = self_attention_block  # Multi-head self-attention mechanism
+        self.feed_forward_block = feed_forward_block      # Feed-forward neural network
+        self.residual_connection = nn.ModuleList([ResidualConnection(dropout) for _ in range(2)])  # Two residual connections for attention and feed-forward blocks
 
     def forward(self, x, src_mask):
+        # Apply self-attention with residual connection and layer norm
         x = self.residual_connection[0](x, lambda x: self.self_attention_block(x, x, x, src_mask))
+        # Apply feed-forward network with residual connection and layer norm
         x = self.residual_connection[1](x, self.feed_forward_block)
         return x
+
 
 class Encoder(nn.Module):
 
     def __init__(self, layers: nn.ModuleList) -> None:
         super().__init__()
-        self.layers = layers
-        self.norm = LayerNormalization()
+        self.layers = layers  # Stack of encoder layers (each with self-attention and feed-forward blocks)
+        self.norm = LayerNormalization()  # Final layer normalization after all encoder layers
 
     def forward(self, x, mask):
+        # Pass input through each encoder layer
         for layer in self.layers:
             x = layer(x, mask)
+        # Apply final layer normalization to the output
         return self.norm(x)
 
 
